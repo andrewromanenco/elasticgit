@@ -10,8 +10,16 @@
 #include "revision.h"
 #include "list-objects.h"
 #include "run-command.h"
+#include "gith.h"
 
 static const char upload_pack_usage[] = "git upload-pack [--strict] [--timeout=<n>] <dir>";
+
+/*
+ * GitH
+ * Upload size in bytes
+ */
+ssize_t totatBytesUploadedRead = 0;
+ssize_t totatBytesUploadedWrite = 0;
 
 /* bits #0..7 in revision.h, #8..10 in commit.c */
 #define THEY_HAVE	(1u << 11)
@@ -252,6 +260,7 @@ static void create_pack_file(void)
 			 */
 			sz = xread(pack_objects.err, progress,
 				  sizeof(progress));
+			totatBytesUploadedRead += sz;
 			if (0 < sz)
 				send_client_data(2, progress, sz);
 			else if (sz == 0) {
@@ -281,6 +290,7 @@ static void create_pack_file(void)
 			}
 			sz = xread(pack_objects.out, cp,
 				  sizeof(data) - outsz);
+			totatBytesUploadedRead += sz;
 			if (0 < sz)
 				;
 			else if (sz == 0) {
@@ -297,6 +307,8 @@ static void create_pack_file(void)
 			else
 				buffered = -1;
 			sz = send_client_data(1, data, sz);
+			totatBytesUploadedWrite += sz;
+			
 			if (sz < 0)
 				goto fail;
 		}
@@ -749,5 +761,9 @@ int main(int argc, char **argv)
 	if (getenv("GIT_DEBUG_SEND_PACK"))
 		debug_fd = atoi(getenv("GIT_DEBUG_SEND_PACK"));
 	upload_pack();
+	
+	/* GitH log usage */
+	gith_log_usage(getGlobalXRead(), getGlobalXWrite(), 0, 0);
+	
 	return 0;
 }

@@ -11,6 +11,7 @@
 #include "progress.h"
 #include "decorate.h"
 #include "fsck.h"
+#include "gith.h"
 
 static int dry_run, quiet, recover, has_errors, strict;
 static const char unpack_usage[] = "git unpack-objects [-n] [-q] [-r] [--strict] < pack-file";
@@ -562,6 +563,9 @@ int cmd_unpack_objects(int argc, const char **argv, const char *prefix)
 		len -= ret;
 		offset += ret;
 	}
+
+	/* GitH log usage */
+	gith_log_usage(0, 0, consumed_bytes, 0);
 
 	/* All done */
 	return has_errors;

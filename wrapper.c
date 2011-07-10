@@ -3,6 +3,26 @@
  */
 #include "cache.h"
 
+
+/*
+ * GitH
+ * Count all bytes sent/read with STDIN and STDOUT
+ */
+
+ssize_t globalXRead = 0;
+ssize_t globalXWrite = 0;
+
+ssize_t getGlobalXRead() {
+	return globalXRead;
+}
+
+ssize_t getGlobalXWrite() {
+	return globalXWrite;
+}
+
+/***/
+
+
 static void do_nothing(size_t size)
 {
 }
@@ -119,6 +139,8 @@ ssize_t xread(int fd, void *buf, size_t len)
 	ssize_t nr;
 	while (1) {
 		nr = read(fd, buf, len);
+		//GitH
+		if ((fd == 0)||(fd == 1)) globalXRead += nr;
 		if ((nr < 0) && (errno == EAGAIN || errno == EINTR))
 			continue;
 		return nr;
@@ -135,6 +157,8 @@ ssize_t xwrite(int fd, const void *buf, size_t len)
 	ssize_t nr;
 	while (1) {
 		nr = write(fd, buf, len);
+		//GitH
+		if ((fd == 0)||(fd == 1)) globalXWrite += nr;
 		if ((nr < 0) && (errno == EAGAIN || errno == EINTR))
 			continue;
 		return nr;

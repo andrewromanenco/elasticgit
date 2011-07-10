@@ -426,6 +426,14 @@ extern char *xstrndup(const char *str, size_t len);
 extern void *xrealloc(void *ptr, size_t size);
 extern void *xcalloc(size_t nmemb, size_t size);
 extern void *xmmap(void *start, size_t length, int prot, int flags, int fd, off_t offset);
+
+/*
+ * GitH
+ * functions from wrapper.c to get traffic volume in bytes
+ */
+extern ssize_t getGlobalXRead();
+extern ssize_t getGlobalXWrite();
+
 extern ssize_t xread(int fd, void *buf, size_t len);
 extern ssize_t xwrite(int fd, const void *buf, size_t len);
 extern int xdup(int fd);

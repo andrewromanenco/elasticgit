@@ -567,6 +567,8 @@ LIB_H += userdiff.h
 LIB_H += utf8.h
 LIB_H += xdiff-interface.h
 LIB_H += xdiff/xdiff.h
+#GitH
+LIB_H += gith.h
 
 LIB_OBJS += abspath.o
 LIB_OBJS += advice.o
@@ -684,6 +686,7 @@ LIB_OBJS += ws.o
 LIB_OBJS += wt-status.o
 LIB_OBJS += xdiff-interface.o
 LIB_OBJS += zlib.o
+LIB_OBJS += gith.o
 
 BUILTIN_OBJS += builtin/add.o
 BUILTIN_OBJS += builtin/annotate.o

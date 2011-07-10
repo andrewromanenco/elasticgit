@@ -11,6 +11,7 @@
 #include "transport.h"
 #include "string-list.h"
 #include "sha1-array.h"
+#include "gith.h"
 
 static const char receive_pack_usage[] = "git receive-pack <git-dir>";
 
@@ -833,5 +834,9 @@ int cmd_receive_pack(int argc, const char **argv, const char *prefix)
 	}
 	if (use_sideband)
 		packet_flush(1);
+		
+	/* GitH log usage */
+	gith_log_usage(getGlobalXRead(), getGlobalXWrite(), 0, 0);
+	
 	return 0;
 }
