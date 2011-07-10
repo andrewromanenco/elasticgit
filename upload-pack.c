@@ -763,7 +763,7 @@ int main(int argc, char **argv)
 	upload_pack();
 	
 	/* GitH log usage */
-	gith_log_usage(getGlobalXRead(), getGlobalXWrite(), 0, 0);
+	gith_log_usage(getGlobalXRead(), getGlobalXWrite(), 0, 0, "up");
 	
 	return 0;
 }

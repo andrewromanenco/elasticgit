@@ -836,7 +836,7 @@ int cmd_receive_pack(int argc, const char **argv, const char *prefix)
 		packet_flush(1);
 		
 	/* GitH log usage */
-	gith_log_usage(getGlobalXRead(), getGlobalXWrite(), 0, 0);
+	gith_log_usage(getGlobalXRead(), getGlobalXWrite(), 0, 0, "rp");
 	
 	return 0;
 }

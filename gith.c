@@ -22,17 +22,20 @@ void createRandomString(char *s, time_t randBase) {
 
 }
 
-void gith_log_usage(ssize_t xread, ssize_t xwrite, ssize_t uread, ssize_t uwrite) {
+void gith_log_usage(ssize_t xread, ssize_t xwrite, ssize_t uread, ssize_t uwrite, char *sx) {
 	time_t tms = time(NULL);
 	char* fileName = getenv("HST_LOG_FILE");
 	FILE *file;
 	if (fileName) {
-		file = fopen(fileName, "w");
+		char *tmpFileName = malloc(100);
+		sprintf(tmpFileName, "/var/log/gith/%s.%s", fileName, sx);
+		file = fopen(tmpFileName, "w");
+		free(tmpFileName);	
 	} else{
 		char *randomName = malloc(GITH_RANDOM_STRING_LEN + 1);
 		createRandomString(randomName, tms);
 		char *tmpFileName = malloc(100);
-		sprintf(tmpFileName, "/var/log/gith/%ld.%s",(long)tms, randomName);
+		sprintf(tmpFileName, "/var/log/gith/%ld.%s.%s",(long)tms, randomName, sx);
 		file = fopen(tmpFileName, "w");
 		free(randomName);
 		free(tmpFileName);	
@@ -63,9 +66,9 @@ void gith_log_usage(ssize_t xread, ssize_t xwrite, ssize_t uread, ssize_t uwrite
 		fprintf(file, "\t\"operation\": \"%s\",\n", "");
 	}
 
-	fprintf(file, "\t\"xread\": %ld,\n", (long)1111);
-	fprintf(file, "\t\"xwrite\": %ld,\n", (long)22222);
-	fprintf(file, "\t\"uwrite\": %ld,\n", (long)333);
+	fprintf(file, "\t\"xread\": %ld,\n", (long)xread);
+	fprintf(file, "\t\"xwrite\": %ld,\n", (long)xwrite);
+	fprintf(file, "\t\"uread\": %ld,\n", (long)uread);
 	fprintf(file, "\t\"timestamp\": %ld\n", (long)tms);
 
 	fprintf(file, "%s", "}");

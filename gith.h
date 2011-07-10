@@ -10,6 +10,10 @@
 #ifndef GITH_H
 #define GITH_H
 
-void gith_log_usage(ssize_t xread, ssize_t xwrite, ssize_t uread, ssize_t uwrite);
+/*
+ * Metrics
+ * sf - suffix to append to generated file
+ */
+void gith_log_usage(ssize_t xread, ssize_t xwrite, ssize_t uread, ssize_t uwrite, char *sx);
 
 #endif

@@ -565,7 +565,7 @@ int cmd_unpack_objects(int argc, const char **argv, const char *prefix)
 	}
 
 	/* GitH log usage */
-	gith_log_usage(0, 0, consumed_bytes, 0);
+	gith_log_usage(0, 0, consumed_bytes, 0, "uo");
 
 	/* All done */
 	return has_errors;
