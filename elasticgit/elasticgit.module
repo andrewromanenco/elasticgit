@@ -1,0 +1,646 @@
+<?php
+
+require_once('sites/all/modules/elasticgit/elasticgit.api.inc');
+
+function elasticgit_menu() {
+  	$items = array();
+	$items['elastic/test'] = array(
+    	'title' => 'ElasticGit',
+    	'page callback' => 'elasticgit_test',
+    	'access arguments' => array('use elasticgit'),
+    	'type' => MENU_CALLBACK
+  		);
+
+	$items['elastic'] = array(
+    	'title' => 'Dashboard',
+    	'page callback' => 'elasticgit_dashboard',
+    	'access arguments' => array('use elasticgit'),
+    	'type' => MENU_CALLBACK
+  		);
+	
+	$items['elastic/createspace'] = array(
+    	'title' => 'Create GIT user',
+    	'page callback' => 'elasticgit_createspace',
+    	'access arguments' => array('use elasticgit'),
+    	'type' => MENU_CALLBACK
+  		);
+
+	$items['elastic/creategitrepo'] = array(
+    	'title' => t('Create GIT repository'),
+    	'page callback' => 'elasticgit_creategitrepo',
+    	'access arguments' => array('use elasticgit'),
+    	'type' => MENU_CALLBACK
+  		);
+
+	$items['elastic/mygitrepositories'] = array(
+    	'title' => t('My GIT repositories'),
+    	'page callback' => 'elasticgit_mygitrepos',
+    	'access arguments' => array('use elasticgit'),
+    	'type' => MENU_CALLBACK
+  		);
+
+	$items['elastic/gitrepositories'] = array(
+    	'title' => t('Accessible GIT repositories'),
+    	'page callback' => 'elasticgit_3rdgitrepos',
+    	'access arguments' => array('use elasticgit'),
+    	'type' => MENU_CALLBACK
+  		);
+
+	$items['elastic/uploadkey'] = array(
+    	'title' => t('Upload SSH key'),
+    	'page callback' => 'elasticgit_uploadkey',
+    	'access arguments' => array('use elasticgit'),
+    	'type' => MENU_CALLBACK
+  		);
+
+	$items['elastic/addgituser'] = array(
+    	'title' => t('Add user to repository'),
+    	'page callback' => 'elasticgit_adduser',
+		//'page arguments' => array(1),
+    	'access arguments' => array('use elasticgit'),
+    	'type' => MENU_CALLBACK
+  		);
+
+	$items['elastic/dropgituser'] = array(
+    	'title' => t('Drop user'),
+    	'page callback' => 'elasticgit_dropuser',
+		//'page arguments' => array(1),
+    	'access arguments' => array('use elasticgit'),
+    	'type' => MENU_CALLBACK
+  		);
+
+	$items['elastic/droprepo'] = array(
+    	'title' => t('Drop repo'),
+    	'page callback' => 'elasticgit_droprepo',
+		//'page arguments' => array(1),
+    	'access arguments' => array('use elasticgit'),
+    	'type' => MENU_CALLBACK
+  		);
+
+	//params: space/repo
+	$items['elastic/api/repokeys'] = array(
+    	'title' => t('Repo keys'),
+    	'page callback' => 'elasticgit_api_repokeys',
+		'access callback' => 'dmdadmin_allow_public',
+    	'access arguments' => array(1),
+    	'type' => MENU_CALLBACK
+  		);
+
+  return $items;
+}
+
+function elasticgit_allow_public() {
+  return true;
+}
+
+function elasticgit_permission(){
+	return array(
+		'use elasticgit' => array(
+			'title' => t('ElasticGIT user')
+				)  
+			);  
+}
+
+function elasticgit_dashboard() {
+	return 'db';
+}
+
+function elasticgit_user_login(&$edit, $account) {
+	$key = elasticgit_util_getKey($account->uid);
+	if (!$key) {
+		drupal_set_message(t('You do not have ssh key yet'), 'warning');
+		drupal_goto('elastic/uploadkey');
+	} else {
+		drupal_goto('elastic/mygitrepositories');
+	}
+}
+
+function elasticgit_spaceform($form_state) {
+	$text = t('Before creating a repository you need a space to store all you data under.<br/><br/>'
+		.'Examples:<br/>&nbsp;&nbsp;&nbsp;<b>NAME</b>@elasticgit.com:project1.git<br><br/>'
+		.'&nbsp;&nbsp;&nbsp;<b>NAME</b>@elasticgit.com:project2.git<br><br/>'
+		.'You will not be able to change this name via web. Support request is required.');
+	$form['name'] = array(
+		'#prefix' => '<div class="formPrefix">'.$text.'</div>',
+		'#type' => 'textfield',
+		'#title' => t('GIT user'),
+		'#size' => 16,
+		'#maxlength' => 16,
+		'#description' => t('2 min. 16 max. alfa numeric. starts with letter'),
+		);
+	$form['submit'] = array('#type' => 'submit', '#value' => t('Create'));
+	return $form;
+}
+
+function elasticgit_spaceform_validate($form, &$form_state) {
+	global $user;
+	if ($form_state['values']['name'] == '') {
+		form_set_error('', t('You must select a name'));
+	} elseif (!preg_match("/^([a-z]([a-z0-9])+)$/", $form_state['values']['name'])) {
+		form_set_error('', t('Space name must match the format'));
+	} elseif (elasticgit_util_getSpaceByName(strtolower($form_state['values']['name']))) {
+		form_set_error('', t('Space already exists. Choose other name'));
+		drupal_goto('elastic/creategitrepo');
+	}
+}
+
+function elasticgit_spaceform_submit($form, &$form_state) {
+	global $user;
+	if (api_createspace(strtolower($form_state['values']['name']))) {
+		db_insert('eg_spaces')
+	      ->fields(array(
+	        'uid' => $user->uid,
+	        'name' => strtolower($form_state['values']['name']),
+			'created' => time()
+	      ))
+	      ->execute();
+		drupal_set_message(t('Space created. Ready to create repo'));
+		drupal_goto('elastic/creategitrepo');
+	} else {
+		$form_state['redirect'] = FALSE;
+		form_set_error('', t('System is in maintenance mode. Try again later'));
+	}
+}
+
+function elasticgit_repoform($form_state) {
+	global $user;
+	$space = elasticgit_util_getSpace($user->uid);
+	$text = t('Path to your new repository will be @space@source.elasticgit.com:NAME.git', array('@space' => $space->name));
+	$form['name'] = array(
+		'#prefix' => '<div class="formPrefix">'.$text.'</div>',
+		'#type' => 'textfield',
+		'#title' => t('Repository name'),
+		'#size' => 16,
+		'#maxlength' => 16,
+		'#description' => t('16 max, alfa numeric'),
+		);
+	$form['submit'] = array(
+		'#type' => 'submit',
+		'#value' => t('Create repository')
+		);
+	return $form;
+}
+
+function elasticgit_repoform_validate($form, &$form_state) {
+	global $user;
+	$us = elasticgit_util_loadUser($user->uid);
+	if (!elasticgit_util_getSpace($user->uid)) {
+		form_set_error('', 'No space');
+		drupal_goto('elastic/createspace');
+	} elseif (!preg_match("/^([a-z0-9]([a-z0-9\-\_])+)$/", $form_state['values']['name'])
+			||(strlen($form_state['values']['name']) > 16)) {
+		form_set_error('', t('Wrong name for GIT repository'));
+	} elseif (elasticgit_util_getRepoByName($user->uid, $form_state['values']['name'])) {
+		form_set_error('', t('Duplicate repo name'));
+	}
+	 elseif (elasticgit_util_getRepoCount($user->uid) >= $us['repo_limit']) {
+		form_set_error('', t('Repository soft limit reached').'<a href="/softlimits" class="mwhy">???</a>');
+	}
+	//unique repo
+}
+
+function elasticgit_repoform_submit($form, &$form_state) {
+	global $user;
+	$space = elasticgit_util_getSpace($user->uid);
+	if (api_createrepo($space->name, $form_state['values']['name'])) {
+		db_insert('eg_repos')
+	      ->fields(array(
+	        'uid' => $user->uid,
+	        'name' => $form_state['values']['name'],
+			'created' => time()
+	      ))
+	      ->execute();
+		drupal_set_message(t('Repository has been created'));
+		drupal_goto('elastic/mygitrepositories');
+	} else {
+		$form_state['redirect'] = FALSE;
+		form_set_error('', t('System is in maintenance mode. Try again later'));
+	}
+}
+
+function elasticgit_keyform($form_state) {
+	global $user;
+	$text = '';
+	$key = elasticgit_util_getKey($user->uid);
+	if ($key) {
+		$text .= t('You current SSH key fingerprint: <b>@fingerprint</b><br/><br/>', array('@fingerprint' => $key->fingerprint));
+	}
+	$text .= t('Insert your public SSH key. (No extra spaces or new lines)');
+	$form['key'] = array(
+		'#prefix' => '<div class="formPrefix">'.$text.'</div>',
+		'#type' => 'textarea',
+		'#title' => t('Public key'),
+		'#cols' => 100,
+		'#rows' => 5
+		);
+	$form['submit'] = array('#type' => 'submit', '#value' => t('Upload key'));
+	return $form;
+}
+
+function elasticgit_keyform_validate($form, &$form_state) {
+	global $user;
+	global $KEY_FINGERPRINT_SCRIPT;
+	global $PATH_KEY_DIR;
+	if ($form_state['values']['key'] == '') {
+		form_set_error('', t('You must provide a key'));
+		return;
+	}
+	$tname = tempnam($PATH_KEY_DIR, "pub");
+	$handle = fopen($tname, "w");
+	fwrite($handle, $form_state['values']['key']);
+	fclose($handle);
+	$result = `$KEY_FINGERPRINT_SCRIPT $tname`;
+	unlink($tname);
+	
+	if (!elasticgit_util_startsWith($result, 'OK:')) {
+		watchdog('elastic', 'Wrong key for %user; error: %error', array('%user' => $user->uid, '%error' => $result), WATCHDOG_WARNING);
+		form_set_error('', t('Data is not a valid public SSH key'));
+	} else {
+		$result = substr($result, 3);
+		$form_state['storage']['fingerprint'] = $result;
+	}
+}
+
+function elasticgit_keyform_submit($form, &$form_state) {
+	global $user;
+	db_delete('eg_keys')
+      ->condition('uid', $user->uid)
+      ->execute();
+	
+	db_insert('eg_keys')
+      ->fields(array(
+        'uid' => $user->uid,
+        'sshkey' => $form_state['values']['key'],
+		'fingerprint' => $form_state['storage']['fingerprint'],
+		'created' => time()
+      ))
+      ->execute();
+
+	watchdog('elastic', 'New ssh key for %user', array(), WATCHDOG_INFO);
+	drupal_set_message(t('Key has been uploaded and activated'));
+}
+
+function elasticgit_adduserform($form_state) {
+	$form['repo'] = array(
+		'#type' => 'textfield',
+		'#title' => t('GIT Repository'),
+		'#size' => 25,
+		'#attributes' => array('readonly'=>'readonly'),
+		'#maxlength' => 64
+		);
+	$form['name'] = array(
+		'#type' => 'textfield',
+		'#title' => t('User Email'),
+		'#size' => 25,
+		'#maxlength' => 64
+		);
+	$form['access'] = array(
+	      '#type' => 'radios', 
+	      '#title' => t('Access level'), 
+	      '#options' => array(t('ReadOnly (R)'),t('ReadWrite (RW)')),
+	    );
+	$form['submit'] = array('#type' => 'submit', '#value' => t('Add user'));
+	return $form;
+}
+
+function elasticgit_adduserform_validate($form, &$form_state) {
+	global $user;
+	//check if owns repo
+	$email = strtolower($form_state['values']['name']);
+	$repo = elasticgit_util_getRepoByName($user->uid, $form_state['values']['repo']);
+	if (!$repo) {
+		form_set_error('', t('Invalid repo'));
+	} elseif (!preg_match("/^([a-zA-Z0-9])+(.)*@(.)+\.([a-zA-Z]{1,10})$/", $email)) {
+		form_set_error('', t('Invalid email address'));
+	} elseif ($email == $user->mail) {
+		form_set_error('', t('You have full access to repo by default'));
+	}
+}
+
+function elasticgit_adduserform_submit($form, &$form_state) {
+	global $user;
+	$email = strtolower($form_state['values']['name']);
+	$repo = elasticgit_util_getRepoByName($user->uid, $form_state['values']['repo']);
+	$u = user_load_by_mail($email);
+	if ($u) {
+		db_delete('eg_repo_access')
+	      ->condition('uid', $u->uid)
+		  ->condition('rid', $repo->rid)
+	      ->execute();
+
+		db_insert('eg_repo_access')
+	      ->fields(array(
+	        'rid' => $repo->rid,
+	        'acl' => $form_state['values']['access'],
+			'uid' => $u->uid,
+			'created' => time()
+	      ))
+	      ->execute();
+		drupal_set_message(t('User added to repository access list'));
+	} else {
+		db_delete('eg_repo_access')
+	      ->condition('email', $email)
+		  ->condition('rid', $repo->rid)
+	      ->execute();
+
+		db_insert('eg_repo_access')
+	      ->fields(array(
+	        'rid' => $repo->rid,
+	        'acl' => $form_state['values']['access'],
+			'email' => $email,
+			'created' => time()
+	      ))
+	      ->execute();
+		drupal_set_message(t('User added to repository access list'));
+	}
+}
+
+function elasticgit_createspace() {
+	return drupal_get_form('elasticgit_spaceform');
+}
+
+function elasticgit_creategitrepo() {
+	global $user;
+	if (elasticgit_util_getSpace($user->uid)) {
+		return drupal_get_form('elasticgit_repoform');
+	} else {
+		drupal_goto('elastic/createspace');
+	}
+}
+
+function elasticgit_uploadkey() {
+	return drupal_get_form('elasticgit_keyform');
+}
+
+function elasticgit_mygitrepos() {
+	global $user;
+	$space = elasticgit_util_getSpace($user->uid);
+	$repos = elasticgit_util_getRepos($user->uid);
+	$output = '';
+	$output .= '<div class="myrepo_toolbar"><a href="/elastic/creategitrepo">'.t('Create GIT repository').'</a></div>';
+	$output .= '<table width="100%" border="0" cellpadding="15" cellspacing="0">';
+	$c = '#EEEEEE';
+	foreach ($repos as $repo) {
+		$output .= '<tr valign="top" bgColor="'.$c.'">';
+		$output .= '<td width="15%">'.$repo->name.' <a href="#" onClick="dropRepo(\''.$repo->name.'\',\''
+			.t('Remove repository: @r ?', array('@r' => $repo->name))
+			.'\'); return false;" class="xdelete">x</a></td>';
+		$output .= '<td width="50%">'.$space->name.'@source.elasticgit.com:/'.$repo->name.'.git</td>';
+		
+		$repoUsers = elasticgit_util_getRepoUsers($repo->rid);
+		
+		$output .= '<td width="35%">';
+		foreach ($repoUsers as $ru) {
+			$output .= '<span class="repouser">';
+			$output .= ' (';
+			$output .= $ru->acl == 0? 'R':'RW';
+			$output .= ') ';
+			$output .= $ru->mail;
+			//$output .= '<a href="/elastic/dropgituser/'.$repo->name.'/'.$ru->mail.'">x</a>';
+			$output .= '<a href="#" onclick="dropUser(\''.$repo->name.'\',\''.$ru->mail.'\', \''
+				.t('Remove access for @mail?', array('@mail' => $ru->mail))
+				.'\'); return false;">x</a>';
+			$output .= '</span><br/>';
+		}
+		$output .= '<a href="/elastic/addgituser/'.$repo->name.'" class="addrepouser">'.t('add user').'</a></td>';
+		$output .= '</tr>';
+		$c = $c == '#EEEEEE'?'#FFFFFF':'#EEEEEE';
+	}
+	$output .= '</table>';
+	return $output;
+}
+
+function elasticgit_3rdgitrepos() {
+	global $user;
+	$output = '';
+	$output .= t('These are repositories other users share with you');
+	$output .= '<table width="100%" border="0" cellpadding="15" cellspacing="0">';
+	$c = '#EEEEEE';
+	
+	$query = db_query("SELECT r.name as name, a.acl as acl, s.name as space, u.mail as mail "
+		."FROM {eg_repo_access} a, {eg_repos} r, {eg_spaces} s, {users} u "
+		."WHERE a.uid = :uid AND a.rid = r.rid AND s.uid = r.uid AND u.uid = r.uid", array(':uid' => $user->uid));
+	$result = array();
+	$output .= '<tr valign="top">';
+	
+	$output .= '<td width="10%"><b>'.t('Repository').'</b></td>';
+	$output .= '<td width="40%"><b>'.t('Address').'</b></td>';
+	$output .= '<td width="45%"><b>'.t('Owner').'</b></td>';
+	$output .= '<td width="5%"><b>'.t('Access').'</b></td>';
+	
+	$output .= '</tr>';
+	foreach ($query as $repo) {
+		$output .= '<tr valign="top" bgColor="'.$c.'">';
+		
+		$output .= '<td width="10%">'.$repo->name.'</td>';
+		$output .= '<td width="40%">'.$repo->space.'@source.elasticgit.com:'.$repo->name.'.git</td>';
+		$output .= '<td width="45%">'.$repo->mail.'</td>';
+		$output .= '<td width="5%">'.($repo->acl == 0? 'R':'RW').'</td>';
+		
+		$output .= '</tr>';
+		$c = $c == '#EEEEEE'?'#FFFFFF':'#EEEEEE';
+	}
+	$output .= '</table>';
+	return $output;
+}
+
+function elasticgit_adduser($repo) {
+	$form = drupal_get_form('elasticgit_adduserform');
+	$form['repo']['#value'] = $repo;
+	return $form;
+}
+
+function elasticgit_dropuser($repoName, $email) {
+	global $user;
+	$repo = elasticgit_util_getRepoByName($user->uid, $repoName);
+	if (!$repo) {
+		drupal_set_message('Access denied', 'error');
+		drupal_goto('elastic/mygitrepositories');
+	} else {
+		$u = user_load_by_mail($email);
+		if ($u) {
+			db_delete('eg_repo_access')
+		      ->condition('uid', $u->uid)
+			  ->condition('rid', $repo->rid)
+		      ->execute();
+		} else {
+			db_delete('eg_repo_access')
+		      ->condition('email', $email)
+			  ->condition('rid', $repo->rid)
+		      ->execute();
+		}
+		drupal_set_message(t('User access has been removed'));
+		drupal_goto('elastic/mygitrepositories');
+	}
+}
+
+function elasticgit_droprepo($repoName) {
+	global $user;
+	$repo = elasticgit_util_getRepoByName($user->uid, $repoName);
+	if (!$repo) {
+		drupal_set_message('Access denied', 'error');
+		drupal_goto('elastic/mygitrepositories');
+	}
+	$space = elasticgit_util_getSpace($user->uid);
+	if (api_droprepo($space->name, $repo->name)) {
+		db_delete('eg_repo_access')
+		  ->condition('rid', $repo->rid)
+	      ->execute();
+		db_delete('eg_repos')
+		  ->condition('rid', $repo->rid)
+	      ->execute();
+		drupal_set_message(t('Repository has been removed'));
+	} else {
+		drupal_set_message(t('System is in maintenance mode. Try again later'), 'error');
+	}
+	drupal_goto('elastic/mygitrepositories');
+}
+
+function elasticgit_user_insert(&$edit, $account, $category) {
+	$email = $account->mail;
+	$uid = $account->uid;
+	db_update('eg_repo_access')
+      ->condition('email', $email)
+      ->fields(array(
+        'email' => NULL,
+		'uid' => $uid
+      ))
+      ->execute();
+}
+
+function elasticgit_api_repokeys($space, $repo) {
+	global $_SERVER;
+	if ($_SERVER['REMOTE_ADDR'] != '127.0.0.1') {
+		print "noaccess";
+		exit;
+	}
+	$space = elasticgit_util_getSpaceByName($space);
+	if (!$space) {
+		print 'nodata';
+		exit;
+	}
+	$repo = elasticgit_util_getRepoByName($space->uid, $repo);
+	if (!$repo) {
+		print 'nodata';
+		exit;
+	}
+	
+	$query = db_query("SELECT sshkey FROM {eg_keys} WHERE uid = :uid", array(':uid' => $space->uid));
+	$result = $query->fetchObject();
+	if ($result) {
+		print $result->sshkey;
+		print "\n";
+	}
+	
+	$query = db_query("SELECT sshkey FROM {eg_repo_access} a, {eg_keys} k WHERE a.rid = :rid AND k.uid = a.uid", array(':rid' => $repo->rid));
+	foreach ($query as $key) {
+		print $key->sshkey;
+		print "\n";
+	}
+	
+	exit;
+}
+
+
+
+function elasticgit_util_getSpace($uid) {
+	$query = db_query("SELECT name, created FROM {eg_spaces} WHERE uid = :uid", array(':uid' => $uid));
+	$result = $query->fetchObject();
+	if ($result) {
+		return $result;
+	} else {
+		return false;
+	}
+}
+
+function elasticgit_util_getSpaceByName($name) {
+	$query = db_query("SELECT uid, name, created FROM {eg_spaces} WHERE name = :name", array(':name' => $name));
+	$result = $query->fetchObject();
+	if ($result) {
+		return $result;
+	} else {
+		return false;
+	}
+}
+
+
+function elasticgit_util_getRepoByName($uid, $name) {
+	$query = db_query("SELECT rid, uid, name, created FROM {eg_repos} WHERE uid = :uid AND name = :name", array(':uid' => $uid, ':name' => $name));
+	$result = $query->fetchObject();
+	if ($result) {
+		return $result;
+	} else {
+		return false;
+	}
+}
+
+function elasticgit_util_getRepos($uid) {
+	$query = db_query("SELECT rid, name FROM {eg_repos} WHERE uid = :uid ORDER BY name", array(':uid' => $uid));
+	$result = array();
+	foreach ($query as $repo) {
+		array_push($result, $repo);
+	}
+	return $result;
+}
+
+function elasticgit_util_getRepoUsers($rid) {
+	$query = db_query("SELECT u.mail, a.acl FROM {eg_repo_access} a, {users} u WHERE a.rid = :rid AND a.uid = u.uid", array(':rid' => $rid));
+	$result = array();
+	foreach ($query as $repo) {
+		array_push($result, $repo);
+	}
+	$query = db_query("SELECT email as mail, acl FROM {eg_repo_access} WHERE rid = :rid AND isnull(uid)", array(':rid' => $rid));
+	foreach ($query as $repo) {
+		array_push($result, $repo);
+	}
+	return $result;
+}
+
+function elasticgit_util_getRepoCount($uid) {
+	$query = db_query("SELECT count(rid) as c FROM {eg_repos} WHERE uid = :uid", array(':uid' => $uid));
+	$result = $query->fetchObject();
+	if ($result) {
+		return $result->c;
+	} else {
+		return 0;
+	}
+}
+
+function elasticgit_util_startsWith($haystack, $needle) {
+    $length = strlen($needle);
+    return (substr($haystack, 0, $length) === $needle);
+}
+
+function elasticgit_util_loadUser($uid) {
+	global $EG_USER_REPO_LIMIT;
+	$u = array();
+	$query = db_query("SELECT repo_limit FROM {eg_users} WHERE uid = :uid", array(':uid' => $uid));
+	$result = $query->fetchObject();
+	if ($result) {
+		$u['repo_limit'] = $result->repo_limit;
+	} else {
+		$u['repo_limit'] = $EG_USER_REPO_LIMIT;
+	}
+	return $u;
+}
+
+function elasticgit_util_getKey($uid) {
+	$query = db_query("SELECT sshkey, fingerprint, created FROM {eg_keys} WHERE uid = :uid", array(':uid' => $uid));
+	$result = $query->fetchObject();
+	if ($result) {
+		return $result;
+	} else {
+		return false;
+	}
+}
+
+function elasticgit_test() {
+	db_update('eg_repo_access')
+      ->condition('email', 'z@z.z')
+      ->fields(array(
+        'email' => NULL,
+		'uid' => 1
+      ))
+      ->execute();
+	return "ElasticGit test";
+}
